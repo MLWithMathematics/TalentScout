@@ -1,0 +1,26 @@
+# Environment & secrets — NEVER commit these
+.env
+data/.encryption_key
+
+# Data directory (contains candidate PII — do not commit)
+data/talentscout.db
+data/audit_log.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,19 @@
+# TalentScout Hiring Assistant — Python Dependencies
+# Install: pip install -r requirements.txt
+
+# ── Core UI ────────────────────────────────────────────────────
+streamlit>=1.35.0
+
+# ── LLM Providers (install all, use whichever you have keys for)
+anthropic>=0.28.0              # Claude (Anthropic)
+google-genai>=1.0.0            # Gemini 2.5 Flash  (google-genai SDK)
+groq>=0.9.0                    # Groq  (Llama-3.3-70b)
+
+# ── Security / Encryption ──────────────────────────────────────
+cryptography>=42.0.0           # Fernet AES-128 encryption for PII at rest
+
+# ── Config ─────────────────────────────────────────────────────
+python-dotenv>=1.0.0           # Load .env file
+
+# ── Database ───────────────────────────────────────────────────
+psycopg2-binary>=2.9.9         # PostgreSQL adapter (Neon/Render)
