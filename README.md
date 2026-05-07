@@ -251,6 +251,22 @@ Questions are generated **once** after the tech stack is declared, stored as a f
 
 ---
 
+## 🚀 Challenges and Solutions 
+
+1. **LLM answering general queries instead of screening**
+   - **Challenge**: The LLM would sometimes get distracted and answer general knowledge or coding queries from the candidate.
+   - **Solution**: Implemented a two-layer protection system. Layer 1 uses a Python-based guardrail (`chatbot/guardrail.py`) to deterministically intercept off-topic messages *before* they reach the LLM. Layer 2 enforces a strict "interviewer only" persona via the `MASTER_SYSTEM_PROMPT` to catch any edge cases.
+
+2. **Inconsistent Phone and Email Verification**
+   - **Challenge**: The LLM was failing to properly catch incorrectly formatted emails or phone numbers during the profile gathering stage.
+   - **Solution**: Moved validation out of the LLM prompt and into deterministic Python functions (`chatbot/validator.py`). User input is now validated via robust regex patterns for email (`validate_email`) and phone (`validate_phone`) *before* being processed, guaranteeing that only valid data is stored and immediate feedback is given on errors.
+
+3. **Skipping or grouping Gathering Information Prompts**
+   - **Challenge**: The LLM was struggling to ask for one piece of information at a time (name, phone, email, etc.), often overwhelming the user by asking for multiple fields at once.
+   - **Solution**: Built a structured state machine in `chatbot/engine.py` (`_process_info_field`). It strictly enforces collecting exactly one `current_field` at a time sequentially from an `INFO_FIELDS` list. The LLM is forced to focus only on the current missing field, and the app only advances to the next field upon successful Python-based validation of the current one.
+
+---
+
 ## 🔧 Technical Details
 
 | Component | Technology | Version |
