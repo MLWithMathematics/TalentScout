@@ -1,7 +1,7 @@
 # 🤖 TalentScout — AI Hiring Assistant
 
 **A GDPR-Compliant, AI-Powered Candidate Screening Chatbot**
-Built with Python · Streamlit · Claude (Anthropic)
+Built with Python · Streamlit · Multi-LLM (Claude, Gemini, Groq) · PostgreSQL
 
 ---
 
@@ -38,7 +38,7 @@ talentscout/
 │   └── validator.py            ← Input validation (email, phone, years, etc.)
 │
 └── data_management/
-    ├── database.py             ← GDPR-compliant SQLite + Fernet encryption
+    ├── database.py             ← GDPR-compliant PostgreSQL/SQLite + Fernet encryption
     ├── encryption.py           ← AES-128 / Fernet field-level encryption
     └── audit_logger.py         ← Append-only GDPR audit trail
 ```
@@ -54,9 +54,9 @@ engine.py       → Validate input, update state, persist to DB
     ↓
 prompts.py      → Build MASTER_SYSTEM_PROMPT + stage context
     ↓
-Anthropic API   → Generate response
+LLM API         → Generate response (Claude, Gemini, Groq)
     ↓
-database.py     → Encrypt PII, write to SQLite
+database.py     → Encrypt PII, write to PostgreSQL/SQLite
     ↓
 audit_logger.py → Append audit entry (no PII in logs)
     ↓
@@ -69,7 +69,9 @@ app.py          → Render assistant message
 
 ### Prerequisites
 - Python 3.10+
-- An Anthropic API key ([console.anthropic.com](https://console.anthropic.com))
+- An LLM API key (Anthropic, Gemini, or Groq)
+- (Production) PostgreSQL Database (e.g., Neon.tech)
+- (Production) Render Account
 
 ### Steps
 
@@ -89,13 +91,44 @@ pip install -r requirements.txt
 
 # 4. Configure environment
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
+# Edit .env and add your preferred LLM API key (e.g., ANTHROPIC_API_KEY)
+# For production, add DATABASE_URL and ENCRYPTION_KEY
 
 # 5. Run the application
 streamlit run app.py
 ```
 
 The app opens at **http://localhost:8501** in your browser.
+
+---
+
+## 🚀 Deployment (Render + Neon)
+
+To deploy TalentScout for free using Render (Web Service) and Neon (Serverless PostgreSQL):
+
+1. **Generate Encryption Key:**
+   ```bash
+   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+   ```
+   Save this as `ENCRYPTION_KEY` in your environment. Keep it safe to prevent data loss!
+
+2. **Neon Database Setup:**
+   Create a free project at [neon.tech](https://neon.tech) and copy your PostgreSQL connection string.
+
+3. **Render Web Service Setup:**
+   - Log in to the [Render Dashboard](https://dashboard.render.com) and create a **New Web Service**.
+   - Connect your GitHub repository.
+   - **Runtime**: `Python 3`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `streamlit run app.py --server.port $PORT --server.address 0.0.0.0`
+   - **Instance Type**: Free tier.
+   - Add these **Environment Variables**:
+     - `PYTHON_VERSION`: `3.11.0`
+     - `DATABASE_URL`: *(Your Neon connection string)*
+     - `ENCRYPTION_KEY`: *(Key generated in step 1)*
+     - `ANTHROPIC_API_KEY` (or `GEMINI_API_KEY` / `GROQ_API_KEY`)
+
+> **Note:** Render's free tier spins down after 15 minutes of inactivity. The next request will take ~50s to wake up.
 
 ---
 
@@ -132,7 +165,7 @@ Type any of: `bye`, `quit`, `exit`, `goodbye`, `stop`, `done` → graceful exit
 - **Art. 13**: Full transparency at session start (data collected, purpose, retention, rights)
 
 ### Data Protection by Design (Art. 25)
-- **Encryption at rest**: All PII fields (name, email, phone) encrypted using Fernet (AES-128-CBC + HMAC-SHA256) before writing to SQLite
+- **Encryption at rest**: All PII fields (name, email, phone) encrypted using Fernet (AES-128-CBC + HMAC-SHA256) before writing to PostgreSQL/SQLite
 - **Pseudonymisation**: Internal logs use only the candidate UUID, never name/email/phone
 - **Masking**: UI displays masked values only (e.g. `j***@gmail.com`, `XXXXX1234`)
 - **Minimisation**: Only fields necessary for recruitment are collected
@@ -223,16 +256,16 @@ Questions are generated **once** after the tech stack is declared, stored as a f
 | Component | Technology | Version |
 |-----------|-----------|---------|
 | UI Framework | Streamlit | ≥ 1.35 |
-| LLM | Claude (Anthropic) | `claude-sonnet-4-20250514` |
+| LLM Support | Claude, Gemini, Groq | Multi-provider |
 | Encryption | Fernet (AES-128-CBC) | cryptography ≥ 42 |
-| Database | SQLite | Built-in (Python) |
-| API Client | anthropic | ≥ 0.28 |
+| Database | PostgreSQL / SQLite | psycopg2-binary / Built-in |
+| Deployment | Render Web Service | Free Tier |
 | Config | python-dotenv | ≥ 1.0 |
 
-### Model choice: `claude-sonnet-4-20250514`
-- Best balance of intelligence and speed for a real-time chat interface
-- Strong instruction-following: essential for the strict stage-machine prompts
-- Supports long system prompts needed for the GDPR guardrails
+### Multi-Model Support
+- **Claude Sonnet 4**: Default choice, best balance of intelligence and speed
+- **Gemini 2.5 Flash**: Fast and capable alternative
+- **Groq (Llama 3.3)**: Ultra-fast open-weight model serving
 
 ---
 
@@ -254,9 +287,9 @@ Questions are generated **once** after the tech stack is declared, stored as a f
 
 | Issue | Fix |
 |-------|-----|
-| `ANTHROPIC_API_KEY not set` | Copy `.env.example` to `.env` and add your key |
-| `ModuleNotFoundError: cryptography` | Run `pip install -r requirements.txt` |
-| Data not persisting | Check `data/` directory exists and is writable |
+| `API Key not set` | Copy `.env.example` to `.env` and add your LLM API key |
+| `ModuleNotFoundError: psycopg2` | Run `pip install psycopg2-binary` |
+| Data not persisting | Check `DATABASE_URL` is correct or `data/` is writable |
 | Chat not starting | Refresh the browser; check terminal for Python errors |
 | Encryption key error | Delete `data/.encryption_key` and restart (creates a new key — existing encrypted data will be unreadable) |
 
@@ -266,6 +299,9 @@ Questions are generated **once** after the tech stack is declared, stored as a f
 
 MIT License — see `LICENSE` file for details.
 
+ML Engineer - Shubhankar 
+
 ---
 
 *Built with ❤️ for TalentScout — where technology meets talent.*
+

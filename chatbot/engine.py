@@ -185,8 +185,12 @@ class ConversationEngine:
             return response, state
 
         # ── 2. Python guardrail (before LLM) ─────────────
-        # Skip for CONSENT — user may type anything as their consent answer
-        if stage not in ("CONSENT", "FAREWELL", "WRAP_UP"):
+        # Bypass for: CONSENT (anything allowed), INFO_GATHERING (field
+        # validators handle all input — guardrail wrongly blocks valid
+        # structured answers like tech stacks: "Python, Django, Docker"),
+        # FAREWELL, WRAP_UP.
+        # Only run guardrail for free-text stages: GREETING, TECH_QUESTIONING.
+        if stage not in ("CONSENT", "INFO_GATHERING", "FAREWELL", "WRAP_UP"):
             off_topic, redirect_msg = self._is_off_topic(user_input, stage)
             if off_topic:
                 # Add exchange to history so LLM retains context
@@ -247,6 +251,16 @@ class ConversationEngine:
                 error_msg = state["validation_error"]
                 state["chat_history"].append({"role": "assistant", "content": error_msg})
                 return error_msg, state
+
+            # ── Tech-stack safety net ────────────────────────────────────
+            # If the stage jumped to TECH_QUESTIONING but tech_stack is
+            # empty/None (LLM skipped collection or guardrail blocked input),
+            # revert to INFO_GATHERING and re-ask for tech_stack explicitly.
+            if (state["stage"] == "TECH_QUESTIONING" and
+                    not state["candidate_info"].get("tech_stack")):
+                state["stage"]         = "INFO_GATHERING"
+                state["current_field"] = "tech_stack"
+                state["validation_error"] = None
 
             response = self._ask_llm(state["chat_history"],
                                      get_stage_prompt(state["stage"], state))
