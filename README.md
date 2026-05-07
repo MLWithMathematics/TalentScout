@@ -140,7 +140,7 @@ To deploy TalentScout for free using Render (Web Service) and Neon (Serverless P
 2. **Give consent** → Type "Yes" to begin (or "No" to exit without data collection)
 3. **Complete your profile** → The chatbot asks one field at a time:
    - Full name, email, phone, years of experience, desired role, location, tech stack
-4. **Answer technical questions** → 10–15 questions tailored to your declared technologies
+4. **Answer technical questions** → 5 questions tailored to your declared technologies
 5. **Receive wrap-up** → Next steps and how to contact TalentScout
 
 ### Exit at any time
