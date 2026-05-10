@@ -265,6 +265,35 @@ Questions are generated **once** after the tech stack is declared, stored as a f
    - **Challenge**: The LLM was struggling to ask for one piece of information at a time (name, phone, email, etc.), often overwhelming the user by asking for multiple fields at once.
    - **Solution**: Built a structured state machine in `chatbot/engine.py` (`_process_info_field`). It strictly enforces collecting exactly one `current_field` at a time sequentially from an `INFO_FIELDS` list. The LLM is forced to focus only on the current missing field, and the app only advances to the next field upon successful Python-based validation of the current one.
 
+4. **Phone Number Accepted Incomplete Numbers (e.g. +91 12345)**
+   - **Challenge**: The old `validate_phone()` only stripped formatting and checked if total digit count was between 7–15. It never verified how many digits came after the country code, so +91 (India) + 5 digits = 7 total digits passed silently.
+   - **Solution**: A `COUNTRY_PHONE_RULES` dictionary was added to `chatbot/validator.py` covering 40+ countries. The validator now strips the country code prefix, counts subscriber digits, and cross-checks against the rule (e.g., India must have exactly 10 digits after +91).
+
+5. **Tech Stack & Position Accepted "IDK", "N/A", Gibberish**
+   - **Challenge**: Inputs like "IDK" or "N/A" were passing length checks. Position only checked for length >= 2, allowing "ok" or "na" to pass as valid job roles.
+   - **Solution**: Added a `VAGUE_RESPONSES` blocklist and a `KNOWN_TECH_KEYWORDS` set of 150+ industry technologies. A dedicated `validate_position()` function was created to reject vague roles like "anything" and ensure roles contain tech-related keywords (e.g., "Engineer", "Developer").
+
+6. **Location Was Not Verified Against Real-World Data**
+   - **Challenge**: Location only checked string length, allowing fictional or vague entries like "Moon City" or "Somewhere" to pass.
+   - **Solution**: Created `validate_location()` which enforces a "City, Country" format and performs live API verification using **OpenStreetMap Nominatim**. It confirms the location exists on the map while failing gracefully (accepting format-only) if the network is unreachable.
+
+7. **LLM Generating Generic Role-Based Questions**
+   - **Challenge**: When generating the technical question bank, the LLM would occasionally ignore the explicitly provided tech stack and instead generate generic questions based on the job role or position (e.g. asking "What makes a great backend engineer?" instead of focusing on Python or PostgreSQL).
+   - **Solution**: Updated `chatbot/prompts.py` (v1.3) by adding a strong "PRIMARY DIRECTIVE" block to the `get_question_generation_prompt`. This explicitly forbids generating questions based on the job role and enforces that every question must revolve strictly around a technology from the candidate's declared tech stack. The Greeting and Info Gathering prompts were also made more explicit to prime the candidate that their tech stack drives the Q&A.
+
+---
+
+## 💡 Recent UX Improvements
+
+### 🆕 Exit Confirmation Dialog
+To prevent accidental session termination, a safety gate was implemented for all `EXIT_KEYWORDS` (e.g., *exit, quit, stop*).
+
+- **How it works**: If a user types an exit word during active screening, `app.py` intercepts the input and displays a styled warning dialog instead of the chat box.
+- **Choices**:
+  - **✅ Yes, Exit**: Forwards the request to the engine to end the session gracefully.
+  - **❌ No, Continue**: Clears the exit state and resumes the session exactly where it was.
+- **Smart Logic**: The dialog is automatically bypassed during non-active stages (CONSENT, FAREWELL, WRAP_UP) to ensure a smooth flow during the beginning and end of the journey.
+
 ---
 
 ## 🔧 Technical Details
@@ -281,7 +310,7 @@ Questions are generated **once** after the tech stack is declared, stored as a f
 ### Multi-Model Support
 - **Claude Sonnet 4**: Default choice, best balance of intelligence and speed
 - **Gemini 2.5 Flash**: Fast and capable alternative
-- **Groq (Llama 3.3)**: Ultra-fast open-weight model serving
+- **Groq (Llama 3.1 8B)**: Ultra-fast open-weight model serving
 
 ---
 
