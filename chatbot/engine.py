@@ -138,15 +138,29 @@ class ConversationEngine:
             if idx + 1 < len(INFO_FIELDS):
                 state["current_field"] = INFO_FIELDS[idx + 1]
             else:
-                # All fields collected → generate questions
+                # All fields collected — verify tech_stack is present before
+                # generating questions.  If it slipped through as empty (should
+                # not happen after guardrail fix, but belt-and-suspenders),
+                # revert to INFO_GATHERING and re-ask for tech_stack explicitly.
                 stack = state["candidate_info"].get("tech_stack", [])
                 if isinstance(stack, str):
-                    stack = [stack]
-                state["tech_questions"]  = self._generate_tech_questions(
+                    stack = [t.strip() for t in stack.split(",") if t.strip()]
+
+                if not stack:
+                    state["current_field"]    = "tech_stack"
+                    state["validation_error"] = (
+                        "I still need your tech stack before we move to the "
+                        "technical questions. Please list your technologies, "
+                        "frameworks, databases, and tools separated by commas — "
+                        "e.g. **Python, Django, PostgreSQL, Docker**."
+                    )
+                    return state
+
+                state["tech_questions"] = self._generate_tech_questions(
                     stack, state["candidate_info"]
                 )
-                state["question_index"]  = 0
-                state["stage"]           = "TECH_QUESTIONING"
+                state["question_index"] = 0
+                state["stage"]          = "TECH_QUESTIONING"
         else:
             state["validation_error"] = result
 

@@ -21,8 +21,8 @@ GROQ_API_KEY: str      = os.getenv("GROQ_API_KEY", "")
 # Per-provider model names
 PROVIDER_MODELS = {
     "Claude (Anthropic)":   "claude-sonnet-4-20250514",
-    "Gemini 2.5 Flash":     "gemini-2.5-flash-preview-04-17",
-    "Groq (Llama-3.3-70b)": "llama-3.3-70b-versatile",
+    "Gemini 2.5 Flash":     "gemini-2.5-flash",
+    "Groq (Llama-3.3-70b)": "llama-3.1-8b-instant",
 }
 
 DEFAULT_PROVIDER: str  = "Claude (Anthropic)"

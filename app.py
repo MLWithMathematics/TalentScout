@@ -30,6 +30,7 @@ from config import (
     COMPANY_NAME,
     DATA_RETENTION_DAYS,
     DEFAULT_PROVIDER,
+    EXIT_KEYWORDS,
     GDPR_CONTACT_EMAIL,
     GDPR_REQUEST_FULFILLMENT_DAYS,
     INFO_FIELDS,
@@ -142,6 +143,8 @@ def _init_session() -> None:
         st.session_state.messages         = []
         st.session_state.started          = False
         st.session_state.gdpr_del_confirm = False
+        st.session_state.pending_exit     = False
+        st.session_state.pending_exit_input = ""
 
 
 _init_session()
@@ -520,20 +523,75 @@ def main() -> None:
         )
         st.rerun()
 
-    # Input
-    if not state["conversation_ended"]:
+    # ── Exit-confirmation dialog (shown when pending_exit is True) ────────
+    if st.session_state.get("pending_exit"):
+        st.markdown("""
+<div style="
+    background: linear-gradient(135deg, #fff3cd, #ffe0b2);
+    border: 2px solid #ff9800;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 12px 0;
+    text-align: center;
+">
+  <h3 style="margin:0 0 8px; color:#e65100;">⚠️ Exit Screening?</h3>
+  <p style="margin:0 0 16px; color:#555; font-size:.93rem;">
+    You're in the middle of the screening process.<br>
+    If you exit now the session will end. Any data collected so far will be saved.
+  </p>
+</div>""", unsafe_allow_html=True)
+
+        col_yes, col_no, col_pad = st.columns([1, 1, 2])
+        with col_yes:
+            if st.button("✅ Yes, Exit", type="primary",
+                         use_container_width=True, key="exit_confirm_btn"):
+                exit_input = st.session_state.pending_exit_input
+                st.session_state.pending_exit       = False
+                st.session_state.pending_exit_input = ""
+                # Now surface the message + farewell in chat
+                st.session_state.messages.append(
+                    {"role": "user", "content": exit_input}
+                )
+                with st.spinner("Wrapping up your session…"):
+                    response, updated_state = engine.handle_message(exit_input, state)
+                st.session_state.state = updated_state
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": response}
+                )
+                st.rerun()
+
+        with col_no:
+            if st.button("❌ No, Continue",
+                         use_container_width=True, key="exit_cancel_btn"):
+                st.session_state.pending_exit       = False
+                st.session_state.pending_exit_input = ""
+                st.rerun()
+
+    # ── Normal input / ended state ────────────────────────────────────────
+    elif not state["conversation_ended"]:
         user_input = st.chat_input("Type your response here…")
         if user_input:
-            st.session_state.messages.append(
-                {"role": "user", "content": user_input}
-            )
-            with st.spinner(f"Thinking via {st.session_state.provider}…"):
-                response, updated_state = engine.handle_message(user_input, state)
-            st.session_state.state = updated_state
-            st.session_state.messages.append(
-                {"role": "assistant", "content": response}
-            )
-            st.rerun()
+            # Intercept exit keywords before passing to engine
+            words_set = set(user_input.strip().lower().split())
+            is_exit   = bool(words_set & EXIT_KEYWORDS)
+            safe_stages = ("CONSENT", "FAREWELL", "WRAP_UP")
+
+            if is_exit and state["stage"] not in safe_stages:
+                # Stash the input and show confirmation on next render
+                st.session_state.pending_exit       = True
+                st.session_state.pending_exit_input = user_input
+                st.rerun()
+            else:
+                st.session_state.messages.append(
+                    {"role": "user", "content": user_input}
+                )
+                with st.spinner(f"Thinking via {st.session_state.provider}…"):
+                    response, updated_state = engine.handle_message(user_input, state)
+                st.session_state.state = updated_state
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": response}
+                )
+                st.rerun()
     else:
         st.markdown("""
 <div class="ended-box">
